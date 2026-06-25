@@ -1,0 +1,482 @@
+local Cleo = {}
+
+function Cleo:Inject(env)
+    env = env or getfenv(2)
+
+    local Services = {}
+
+    function Services:Gets(Name)
+        return game:GetService(Name)
+    end
+
+    setmetatable(Services, {
+        __index = function(_, Name)
+            return game:GetService(Name)
+        end
+    })
+
+    env.SS = Services
+
+    env.Create = function(Class, Properties)
+        local Object = Instance.new(Class)
+        if Properties then
+            local Children = Properties.Children
+            Properties.Children = nil
+            for Key, Value in pairs(Properties) do
+                Object[Key] = Value
+            end
+            if Children then
+                for _, Child in ipairs(Children) do
+                    Child.Parent = Object
+                end
+            end
+        end
+        return Object
+    end
+
+    env.Cube = function(Properties)
+        return env.Create("Part", Properties)
+    end
+
+    env.Btn = function(Properties)
+        return env.Create("TextButton", Properties)
+    end
+
+    env.Lbl = function(Properties)
+        return env.Create("TextLabel", Properties)
+    end
+
+    env.Frame = function(Properties)
+        return env.Create("Frame", Properties)
+    end
+
+    env.Img = function(Properties)
+        return env.Create("ImageLabel", Properties)
+    end
+
+    env.Scroll = function(Properties)
+        return env.Create("ScrollingFrame", Properties)
+    end
+
+    env.V3 = Vector3.new
+    env.V2 = Vector2.new
+    env.CF = CFrame.new
+    env.UD2 = UDim2.new
+    env.U = UDim.new
+
+    env.C3 = function(R, G, B)
+        return Color3.fromRGB(R, G, B)
+    end
+
+    env.Hex = function(Value)
+        return Color3.fromHex(Value)
+    end
+
+    env.Wait = task.wait
+    env.Spawn = task.spawn
+    env.Delay = task.delay
+    env.Defer = task.defer
+
+    env.Print = print
+    env.Warn = warn
+    env.Err = error
+
+    env.Each = function(Table, Function)
+        for Key, Value in pairs(Table) do
+            Function(Value, Key)
+        end
+    end
+
+    env.Map = function(Table, Function)
+        local New = {}
+        for Key, Value in pairs(Table) do
+            New[Key] = Function(Value, Key)
+        end
+        return New
+    end
+
+    env.Filter = function(Table, Function)
+        local New = {}
+        for Key, Value in pairs(Table) do
+            if Function(Value, Key) then
+                table.insert(New, Value)
+            end
+        end
+        return New
+    end
+
+    env.Find = function(Table, Function)
+        for Key, Value in pairs(Table) do
+            if Function(Value, Key) then
+                return Value
+            end
+        end
+    end
+
+    env.Clone = function(Table)
+        local New = {}
+        for Key, Value in pairs(Table) do
+            if type(Value) == "table" then
+                New[Key] = env.Clone(Value)
+            else
+                New[Key] = Value
+            end
+        end
+        return New
+    end
+
+    env.Merge = function(...)
+        local New = {}
+        for _, T in ipairs({ ... }) do
+            for K, V in pairs(T) do
+                New[K] = V
+            end
+        end
+        return New
+    end
+
+    env.Split = function(String, Separator)
+        return string.split(String, Separator or " ")
+    end
+
+    env.Join = function(Table, Separator)
+        return table.concat(Table, Separator or "")
+    end
+
+    env.StartsWith = function(String, Prefix)
+        return String:sub(1, #Prefix) == Prefix
+    end
+
+    env.EndsWith = function(String, Suffix)
+        return Suffix == "" or String:sub(-#Suffix) == Suffix
+    end
+
+    env.Class = function(Definition)
+        Definition = Definition or {}
+        local Class = {}
+        Class.__index = Class
+
+        for K, V in pairs(Definition) do
+            Class[K] = V
+        end
+
+        function Class.New(...)
+            local Self = setmetatable({}, Class)
+            if Self.Init then
+                Self:Init(...)
+            end
+            return Self
+        end
+
+        function Class.Extend(SubDefinition)
+            SubDefinition = SubDefinition or {}
+            local SubClass = {}
+            for K, V in pairs(Class) do
+                if K ~= "New" and K ~= "Extend" then
+                    SubClass[K] = V
+                end
+            end
+            SubClass.__index = SubClass
+            SubClass.Super = Class
+            for K, V in pairs(SubDefinition) do
+                SubClass[K] = V
+            end
+            function SubClass.New(...)
+                local Self = setmetatable({}, SubClass)
+                if Self.Init then
+                    Self:Init(...)
+                end
+                return Self
+            end
+            return SubClass
+        end
+
+        return Class
+    end
+
+    env.Signal = function()
+        local Listeners = {}
+        local Signal = {}
+        function Signal:Connect(Callback)
+            table.insert(Listeners, Callback)
+            return {
+                Disconnect = function()
+                    for I, Listener in ipairs(Listeners) do
+                        if Listener == Callback then
+                            table.remove(Listeners, I)
+                            break
+                        end
+                    end
+                end
+            }
+        end
+        function Signal:Fire(...)
+            for _, Listener in ipairs(Listeners) do
+                task.spawn(Listener, ...)
+            end
+        end
+        function Signal:Wait()
+            local Thread = coroutine.running()
+            local Connection = Signal:Connect(function(...)
+                task.spawn(Thread, ...)
+            end)
+            local Result = { coroutine.yield() }
+            Connection:Disconnect()
+            return table.unpack(Result)
+        end
+        return Signal
+    end
+
+    env.Connect = function(Signal, Callback)
+        return Signal:Connect(Callback)
+    end
+
+    env.Once = function(Signal, Callback)
+        local Connection
+        Connection = Signal:Connect(function(...)
+            Connection:Disconnect()
+            Callback(...)
+        end)
+        return Connection
+    end
+
+    env.Destroy = function(Object)
+        if Object then
+            Object:Destroy()
+        end
+    end
+
+    env.IsA = function(Object, Name)
+        return Object:IsA(Name)
+    end
+
+    env.Children = function(Object)
+        return Object:GetChildren()
+    end
+
+    env.Descendants = function(Object)
+        return Object:GetDescendants()
+    end
+
+    env.Player = function()
+        return game:GetService("Players").LocalPlayer
+    end
+
+    env.IsEmpty = function(Table)
+        return next(Table) == nil
+    end
+
+    env.Keys = function(Table)
+        local Keys = {}
+        for K, _ in pairs(Table) do
+            table.insert(Keys, K)
+        end
+        return Keys
+    end
+
+    env.Values = function(Table)
+        local Values = {}
+        for _, V in pairs(Table) do
+            table.insert(Values, V)
+        end
+        return Values
+    end
+
+    env.Pick = function(Table, ...)
+        local Picked = {}
+        local Keys = { ... }
+        for _, Key in ipairs(Keys) do
+            Picked[Key] = Table[Key]
+        end
+        return Picked
+    end
+
+    env.Omit = function(Table, ...)
+        local Omitted = {}
+        local OmitKeys = { ... }
+        local OmitSet = {}
+        for _, K in ipairs(OmitKeys) do
+            OmitSet[K] = true
+        end
+        for K, V in pairs(Table) do
+            if not OmitSet[K] then
+                Omitted[K] = V
+            end
+        end
+        return Omitted
+    end
+
+    env.Trim = function(String)
+        return String:match("^%s*(.-)%s*$")
+    end
+
+    env.Reverse = function(String)
+        local Reversed = ""
+        for I = #String, 1, -1 do
+            Reversed = Reversed .. String:sub(I, I)
+        end
+        return Reversed
+    end
+
+    env.Format = string.format
+    env.Upper = string.upper
+    env.Lower = string.lower
+    env.Gsub = string.gsub
+
+    env.WaitForChild = function(Instance, Name, Timeout)
+        return Instance:WaitForChild(Name, Timeout)
+    end
+
+    env.FindFirstChild = function(Instance, Name)
+        return Instance:FindFirstChild(Name)
+    end
+
+    env.Tween = function(Instance, Properties, Duration, EasingStyle, EasingDirection, RepeatCount, Reverses, DelayTime)
+        local TweenService = game:GetService("TweenService")
+        local TweenInfo = TweenInfo.new(
+            Duration,
+            EasingStyle or Enum.EasingStyle.Quad,
+            EasingDirection or Enum.EasingDirection.Out,
+            RepeatCount or 0,
+            Reverses or false,
+            DelayTime or 0
+        )
+        local Tween = TweenService:Create(Instance, TweenInfo, Properties)
+        Tween:Play()
+        return Tween
+    end
+
+    env.Clamp = function(Value, Min, Max)
+        return math.max(Min, math.min(Max, Value))
+    end
+
+    env.Lerp = function(A, B, T)
+        return A + (B - A) * T
+    end
+
+    env.RandomRange = function(Min, Max)
+        return math.random() * (Max - Min) + Min
+    end
+
+    env.RandomInt = function(Min, Max)
+        return math.random(Min, Max)
+    end
+
+    env.Shuffle = function(Table)
+        for I = #Table, 2, -1 do
+            local J = math.random(I)
+            Table[I], Table[J] = Table[J], Table[I]
+        end
+        return Table
+    end
+
+    env.Unique = function(Table)
+        local Seen = {}
+        local Result = {}
+        for _, Value in ipairs(Table) do
+            if not Seen[Value] then
+                Seen[Value] = true
+                table.insert(Result, Value)
+            end
+        end
+        return Result
+    end
+
+    env.Flatten = function(Table, Depth)
+        Depth = Depth or math.huge
+        local Result = {}
+        local function Flatten(T, CurrentDepth)
+            if CurrentDepth > Depth then
+                table.insert(Result, T)
+                return
+            end
+            for _, Value in ipairs(T) do
+                if type(Value) == "table" then
+                    Flatten(Value, CurrentDepth + 1)
+                else
+                    table.insert(Result, Value)
+                end
+            end
+        end
+        Flatten(Table, 1)
+        return Result
+    end
+
+    env.Invert = function(Table)
+        local Inverted = {}
+        for K, V in pairs(Table) do
+            Inverted[V] = K
+        end
+        return Inverted
+    end
+
+    env.Debounce = function(Function, WaitTime)
+        local Timer
+        return function(...)
+            if Timer then
+                Timer:Disconnect()
+            end
+            Timer = task.delay(WaitTime, function()
+                Timer = nil
+                Function(...)
+            end)
+        end
+    end
+
+    env.Throttle = function(Function, Limit, Interval)
+        local Calls = 0
+        local Cooldown = false
+        return function(...)
+            if Cooldown then return end
+            Calls = Calls + 1
+            if Calls >= Limit then
+                Cooldown = true
+                task.delay(Interval, function()
+                    Cooldown = false
+                    Calls = 0
+                end)
+            end
+            Function(...)
+        end
+    end
+
+    env.Async = function(Function)
+        return function(...)
+            local Thread = coroutine.create(Function)
+            local Args = { ... }
+            task.spawn(Thread, table.unpack(Args))
+        end
+    end
+
+    env.Await = function(AsyncFunction, ...)
+        local Co = coroutine.running()
+        local Args = { ... }
+        task.spawn(AsyncFunction, table.unpack(Args))
+        local Result = { coroutine.yield() }
+        return table.unpack(Result)
+    end
+
+    env.WaitFor = function(Condition, Timeout, Interval)
+        Interval = Interval or 0.1
+        local Elapsed = 0
+        while not Condition() do
+            if Timeout and Elapsed >= Timeout then
+                return false
+            end
+            task.wait(Interval)
+            Elapsed = Elapsed + Interval
+        end
+        return true
+    end
+
+    env.Pipe = function(Value, ...)
+        local Functions = { ... }
+        local Result = Value
+        for _, Func in ipairs(Functions) do
+            Result = Func(Result)
+        end
+        return Result
+    end
+end
+
+return Cleo
