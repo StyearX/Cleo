@@ -479,4 +479,5 @@ function Cleo:Inject(env)
     end
 end
 
+Cleo:Inject(getfenv(2))
 return Cleo
